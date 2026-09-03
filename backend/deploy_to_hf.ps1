@@ -1,4 +1,4 @@
-# MedPak AI — Deploy backend to a Hugging Face Docker Space
+# MedPak AI - Deploy backend to a Hugging Face Docker Space
 #
 # Prerequisites:
 #   1. Create the Space first: https://huggingface.co/new-space
@@ -36,18 +36,18 @@ if ($LASTEXITCODE -ne 0) {
     throw "Clone failed. Create the Space first at https://huggingface.co/new-space (SDK: Docker, Public)."
 }
 
-# Copy backend files — exclude secrets, caches, private user data and local
+# Copy backend files - exclude secrets, caches, private user data and local
 # runtime state (the app recreates empty DBs on first boot):
-#   users.db      : real emails + password hashes — NEVER leave this machine
+#   users.db      : real emails + password hashes - NEVER leave this machine
 #   live_prices.db / history.db : runtime caches
-#   chroma_store  : RAG index — rebuilt automatically in the background on boot
+#   chroma_store  : RAG index - rebuilt automatically in the background on boot
 robocopy . $tmp /E /XD __pycache__ venv .venv .git chroma_store /XF .env *.pyc *.log history.db users.db live_prices.db *.db-wal *.db-shm deploy_to_hf.ps1 | Out-Null
 
 Push-Location $tmp
 try {
     git config user.name $HfUser
     git config user.email "$HfUser@users.noreply.huggingface.co"
-    # pharmapedia.db (15 MB) exceeds HF's 10 MB plain-git limit — track *.db
+    # pharmapedia.db (15 MB) exceeds HF's 10 MB plain-git limit - track *.db
     # with Git LFS (Hugging Face fully supports LFS in Spaces).
     git lfs install
     "*.db filter=lfs diff=lfs merge=lfs -text" | Out-File -FilePath .gitattributes -Encoding ascii
@@ -58,7 +58,7 @@ try {
     git push
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
-        Write-Host "Push failed — when prompted: username = $HfUser, password = HF write token." -ForegroundColor Yellow
+        Write-Host "Push failed - when prompted: username = $HfUser, password = HF write token." -ForegroundColor Yellow
         Write-Host "Retry manually:  cd $tmp ;  git push"
         exit 1
     }
