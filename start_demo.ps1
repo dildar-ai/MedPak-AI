@@ -14,6 +14,7 @@
 #
 # While testing: keep this PC on and awake (friends hit your machine).
 # Stop the demo: close the ngrok window and the backend window.
+# ngrok writes its log to ngrok_demo.log in the project root (gitignored).
 
 $NgrokDomain = "astound-snowiness-storm.ngrok-free.dev"
 
@@ -69,10 +70,14 @@ if (-not $ready) { throw "Backend did not come up - check its window for errors.
 
 # -- Start the tunnel with your fixed public URL -----------------------------
 Write-Host ">> Starting ngrok tunnel to $NgrokDomain ..." -ForegroundColor Green
-Start-Process $ngrokExe -ArgumentList "http", "8000", "--domain=$NgrokDomain"
+$ngrokLog = Join-Path $root "ngrok_demo.log"
+if (Test-Path $ngrokLog) { Remove-Item $ngrokLog -Force }
+# The log path contains spaces, so it must be quoted for the command line.
+$logArg = '"' + $ngrokLog + '"'
+Start-Process $ngrokExe -ArgumentList "http", "8000", "--domain=$NgrokDomain", "--log", $logArg
 
 $publicUrl = $null
-for ($i = 0; $i -lt 20; $i++) {
+for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 1
     try {
         $tunnels   = (Invoke-RestMethod "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 2).tunnels
@@ -80,7 +85,14 @@ for ($i = 0; $i -lt 20; $i++) {
         if ($publicUrl) { break }
     } catch { }
 }
-if (-not $publicUrl) { throw "Tunnel did not come up - check the ngrok window (wrong domain? no internet?)." }
+if (-not $publicUrl) {
+    # Show why ngrok failed instead of making you guess
+    Write-Host "!! Tunnel failed - last ngrok log lines:" -ForegroundColor Red
+    if (Test-Path $ngrokLog) {
+        Get-Content $ngrokLog -Tail 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+    }
+    throw "Tunnel did not come up (see log above; full log kept in ngrok_demo.log)"
+}
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan

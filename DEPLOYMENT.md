@@ -75,6 +75,15 @@ since your PC has the RAM for them).
 > user PATH, but windows that were already open keep the old PATH. Either
 > fully close and reopen your terminal app — or ignore it: `start_demo.ps1`
 > finds ngrok inside the winget package folder automatically.
+>
+> **Old agent via winget:** the `ngrok.ngrok` winget package ships ngrok 3.3.1,
+> which ngrok's servers reject for free accounts (`ERR_NGROK_121`, minimum
+> agent 3.20.0). Fix: run `ngrok update`. Windows Defender may then quarantine
+> the updated `ngrok.exe` (tunneling tools trip its heuristics) — allow it by
+> adding a Defender exclusion for the package folder
+> (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\Ngrok.Ngrok_*`) and re-running
+> `ngrok update`. If a tunnel ever fails, `start_demo.ps1` prints ngrok's own
+> error from `ngrok_demo.log`.
 
 ### Step 2 — Build the frontend (once, and after any UI change)
 
