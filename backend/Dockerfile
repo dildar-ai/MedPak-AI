@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python packages
+# CPU-only PyTorch first: the default Linux wheels bundle CUDA (~4 GB) that a
+# CPU-only deployment never uses — skipping it shrinks the image and cuts
+# build time by more than half.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -32,5 +36,7 @@ USER user
 # Expose Hugging Face default port
 EXPOSE 7860
 
-# Start FastAPI with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Start FastAPI with uvicorn.
+# --proxy-headers: Hugging Face routes traffic through its proxy — without
+# this every visitor shares the proxy's IP and one combined rate-limit bucket.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]

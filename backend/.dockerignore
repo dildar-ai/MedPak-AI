@@ -9,6 +9,9 @@ venv/
 
 # Local runtime state (regenerated in the container)
 database/history.db
+database/users.db
+database/live_prices.db
+database/chroma_store/
 *.log
 
 # Deployment helpers (not needed inside the image)

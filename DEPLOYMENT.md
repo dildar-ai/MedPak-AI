@@ -67,6 +67,10 @@ From the `backend/` folder:
 When git asks for credentials: username = your HF username, password = an
 **HF access token** with *write* permission ([settings/tokens](https://huggingface.co/settings/tokens)).
 
+The script handles Git LFS automatically (the 15 MB medicine database exceeds
+HF's 10 MB plain-git limit) and never uploads user accounts or local caches —
+only source code, the medicine DB and the Dvago product index.
+
 ### Step 3 — Add secrets in the Space
 
 Space → **Settings → Variables and secrets** → add:
@@ -83,7 +87,7 @@ Space → **Settings → Variables and secrets** → add:
 The Docker image installs PyTorch + EasyOCR. When it finishes, verify:
 
 ```
-https://<your-hf-username>-medpak-ai-backend.hf.space/api/health
+https://<your-hf-username>-medpak-ai-backend.hf.space/api/health/
 ```
 
 > Notes: free Spaces sleep after ~48 h idle (first request after sleep takes ~30 s).
@@ -95,26 +99,49 @@ https://<your-hf-username>-medpak-ai-backend.hf.space/api/health
 
 ## 4. Deploy the Frontend to Vercel (free, permanent)
 
-```bash
-cd frontend
-npm i -g vercel      # once
-vercel               # first-time login + project link
-```
+### Step 1 — Import the repository
 
-Set the environment variable (Vercel dashboard → Settings → Environment Variables,
-or when prompted):
+1. Go to [vercel.com](https://vercel.com) → **Sign Up** → continue with GitHub
+   (this login is for *you, the developer* — your visitors will never see it)
+2. **Add New… → Project** → find **MedPak-AI** → **Import**
+
+### Step 2 — Configure the import (two things matter)
+
+| Setting | Value |
+|---|---|
+| Framework Preset | Vite (auto-detected) |
+| **Root Directory** | **`frontend`** — click *Edit* and select it. The repo root also holds `backend/`; skipping this is the #1 cause of failed builds |
+
+Add this **Environment Variable** on the same screen:
 
 | Name | Value |
 |---|---|
 | `VITE_API_BASE_URL` | `https://<your-hf-username>-medpak-ai-backend.hf.space/api` |
 
-Then ship it:
+Leave Build Command and Output Directory at their defaults, click **Deploy**
+(≈ 1 minute).
+
+### Step 3 — Share the public URL
+
+When the build finishes, open **Domains** — you get a link like
+`https://medpak-ai.vercel.app`. It is **fully public**: anyone can open it,
+register a MedPak AI account inside the app and start testing. **Vercel never
+asks visitors to log in** — production URLs on `*.vercel.app` are open by default.
+
+> Seeing a Vercel password screen anyway? That's "Deployment Protection",
+> which only guards *preview* URLs on some plans. Fix it once:
+> **Project → Settings → Deployment Protection → Disabled**, and share the
+> *Production* URL from the Domains tab. Note: changing `VITE_API_BASE_URL`
+> later requires a redeploy (Vite bakes it in at build time).
+
+### CLI alternative
 
 ```bash
-vercel --prod
+cd frontend
+npm i -g vercel      # once
+vercel               # first-time login + project link
+vercel --prod        # ship to production
 ```
-
-You now have a public link like `https://medpak-ai.vercel.app` — share it anywhere.
 
 ---
 

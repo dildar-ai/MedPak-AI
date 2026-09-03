@@ -23,6 +23,8 @@ $appUrl = "https://$HfUser-$SpaceName.hf.space"
 
 if (-not (Test-Path ".\main.py")) { throw "Run this script from the backend\ folder." }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw "Install git first: https://git-scm.com" }
+git lfs version *> $null
+if ($LASTEXITCODE -ne 0) { throw "Install Git LFS first: https://git-lfs.com" }
 
 Write-Host "Deploying MedPak AI backend to: $spaceUrl" -ForegroundColor Cyan
 
@@ -34,13 +36,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Clone failed. Create the Space first at https://huggingface.co/new-space (SDK: Docker, Public)."
 }
 
-# Copy backend files — exclude secrets, caches and local runtime state
-robocopy . $tmp /E /XD __pycache__ venv .venv .git /XF .env *.pyc *.log history.db deploy_to_hf.ps1 | Out-Null
+# Copy backend files — exclude secrets, caches, private user data and local
+# runtime state (the app recreates empty DBs on first boot):
+#   users.db      : real emails + password hashes — NEVER leave this machine
+#   live_prices.db / history.db : runtime caches
+#   chroma_store  : RAG index — rebuilt automatically in the background on boot
+robocopy . $tmp /E /XD __pycache__ venv .venv .git chroma_store /XF .env *.pyc *.log history.db users.db live_prices.db *.db-wal *.db-shm deploy_to_hf.ps1 | Out-Null
 
 Push-Location $tmp
 try {
     git config user.name $HfUser
     git config user.email "$HfUser@users.noreply.huggingface.co"
+    # pharmapedia.db (15 MB) exceeds HF's 10 MB plain-git limit — track *.db
+    # with Git LFS (Hugging Face fully supports LFS in Spaces).
+    git lfs install
+    "*.db filter=lfs diff=lfs merge=lfs -text" | Out-File -FilePath .gitattributes -Encoding ascii
     git add -A
     # dvago_products.txt is gitignored locally but wanted in the image (warm price index)
     git add -f scrapers/dvago_products.txt 2>$null
@@ -59,7 +69,7 @@ try {
 Remove-Item -Recurse -Force $tmp
 
 Write-Host ""
-Write-Host "Deployed! First build takes ~10-20 min (installs PyTorch + EasyOCR)." -ForegroundColor Green
+Write-Host "Deployed! First build takes ~8-15 min (installs PyTorch CPU + EasyOCR)." -ForegroundColor Green
 Write-Host "  Space:  $spaceUrl"
 Write-Host "  API:    $appUrl/api/health"
 Write-Host ""
