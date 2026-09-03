@@ -1,5 +1,5 @@
-# MedPak AI — self-hosted demo launcher
-# ─────────────────────────────────────────────────────────────────────────────
+# MedPak AI - self-hosted demo launcher
+# ---------------------------------------------------------------------------
 # Starts the backend (which also serves the built frontend) and tunnels it
 # through ngrok so friends can test the app from anywhere.
 #
@@ -15,27 +15,45 @@
 # While testing: keep this PC on and awake (friends hit your machine).
 # Stop the demo: close the ngrok window and the backend window.
 
-$NgrokDomain = "PASTE_YOUR_STATIC_DOMAIN_HERE"   # e.g. "calm-badger-123.ngrok-free.app"
+$NgrokDomain = "astound-snowiness-storm.ngrok-free.dev"
 
 $ErrorActionPreference = "Stop"
 $root    = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backend = Join-Path $root "backend"
 
-# ── Sanity checks ────────────────────────────────────────────────────────────
-if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
-    throw "ngrok is not installed. Run:  winget install ngrok.ngrok   (then reopen this window)"
+# -- Locate ngrok -------------------------------------------------------------
+# winget installs ngrok under AppData without refreshing the PATH of windows
+# that were already open, so look it up explicitly instead of relying on it.
+$ngrokExe = $null
+$cmd = Get-Command ngrok -ErrorAction SilentlyContinue
+if ($cmd) {
+    $ngrokExe = $cmd.Source
+} else {
+    $candidates = @(
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Links\ngrok.exe"
+        Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Directory -Filter "ngrok*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName "ngrok.exe" }
+        "C:\Program Files\ngrok\ngrok.exe"
+        "C:\ProgramData\chocolatey\bin\ngrok.exe"
+    )
+    $ngrokExe = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 }
+if (-not $ngrokExe) {
+    throw "ngrok is not installed. Run:  winget install ngrok.ngrok   (then run this script again)"
+}
+Write-Host ">> Using ngrok: $ngrokExe"
+
 if ($NgrokDomain -eq "PASTE_YOUR_STATIC_DOMAIN_HERE") {
     throw "Set your free static domain in `$NgrokDomain at the top of this script (claim it at https://dashboard.ngrok.com/domains)"
 }
-ngrok config check | Out-Null
+& $ngrokExe config check | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    throw "ngrok has no auth token yet. Run:  ngrok config add-authtoken <YOUR_TOKEN>"
+    throw ("ngrok has no auth token yet. Run once:  & '{0}' config add-authtoken <YOUR_TOKEN>" -f $ngrokExe)
 }
 
-# ── Start the backend (API + frontend build) unless it is already running ────
+# -- Start the backend (API + frontend build) unless it is already running ----
 if (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) {
-    Write-Host ">> Backend already running on port 8000 — reusing it." -ForegroundColor Yellow
+    Write-Host ">> Backend already running on port 8000 - reusing it." -ForegroundColor Yellow
 } else {
     Write-Host ">> Starting backend (API + frontend) in a new window..." -ForegroundColor Green
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$backend'; python main.py"
@@ -47,11 +65,11 @@ for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 1
     try { Invoke-RestMethod "http://127.0.0.1:8000/api/health/" -TimeoutSec 2 | Out-Null; $ready = $true; break } catch { }
 }
-if (-not $ready) { throw "Backend did not come up — check its window for errors." }
+if (-not $ready) { throw "Backend did not come up - check its window for errors." }
 
-# ── Start the tunnel with your fixed public URL ──────────────────────────────
+# -- Start the tunnel with your fixed public URL -----------------------------
 Write-Host ">> Starting ngrok tunnel to $NgrokDomain ..." -ForegroundColor Green
-Start-Process ngrok -ArgumentList "http", "8000", "--domain=$NgrokDomain"
+Start-Process $ngrokExe -ArgumentList "http", "8000", "--domain=$NgrokDomain"
 
 $publicUrl = $null
 for ($i = 0; $i -lt 20; $i++) {
@@ -62,11 +80,11 @@ for ($i = 0; $i -lt 20; $i++) {
         if ($publicUrl) { break }
     } catch { }
 }
-if (-not $publicUrl) { throw "Tunnel did not come up — check the ngrok window (wrong domain? no internet?)." }
+if (-not $publicUrl) { throw "Tunnel did not come up - check the ngrok window (wrong domain? no internet?)." }
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "  MedPak AI is LIVE — share this link with your testers:"    -ForegroundColor Cyan
+Write-Host "  MedPak AI is LIVE - share this link with your testers:"    -ForegroundColor Cyan
 Write-Host "  $publicUrl"                                                -ForegroundColor Yellow
 Write-Host "  Local copy: http://127.0.0.1:8000"                         -ForegroundColor Cyan
 Write-Host "  Keep this PC on. Close the ngrok window to stop."          -ForegroundColor Cyan

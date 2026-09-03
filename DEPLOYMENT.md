@@ -1,4 +1,4 @@
-# MedPak AI — Setup & Deployment Guide
+ # MedPak AI — Setup & Deployment Guide
 
 Two ways to share MedPak AI:
 
@@ -70,6 +70,11 @@ since your PC has the RAM for them).
    [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
 4. Claim your free **static domain** (a permanent URL):
    [dashboard.ngrok.com/domains](https://dashboard.ngrok.com/domains)
+
+> If `ngrok` is "not recognized" after installing: winget added it to your
+> user PATH, but windows that were already open keep the old PATH. Either
+> fully close and reopen your terminal app — or ignore it: `start_demo.ps1`
+> finds ngrok inside the winget package folder automatically.
 
 ### Step 2 — Build the frontend (once, and after any UI change)
 
