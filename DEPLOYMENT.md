@@ -1,9 +1,13 @@
 # MedPak AI — Setup & Deployment Guide
 
-Share MedPak AI with anyone via two free public URLs:
+Two ways to share MedPak AI:
 
-- **Backend** → Hugging Face Spaces (Docker, 16 GB RAM — runs FastAPI + OCR + RAG)
-- **Frontend** → Vercel (React/Vite static build)
+- **Now — self-hosted demo (free, no card):** your PC runs the whole app and
+  friends get a permanent ngrok URL. One URL serves everything — the backend
+  also serves the built frontend (see §3).
+- **Later — cloud deployment:** Hugging Face Space (backend) + Vercel
+  (frontend). Note: since July 2026 HF requires a paid PRO plan to create
+  Docker Spaces, so that path costs $9/month (cancel anytime).
 
 ---
 
@@ -46,9 +50,77 @@ npm run dev                    # http://localhost:5173
 
 The Vite dev server proxies `/api/*` to `http://127.0.0.1:8000` automatically.
 
+> If `frontend/dist` exists (after `npm run build`), the backend serves the
+> finished app at **http://localhost:8000** — no separate frontend server
+> needed. That is the self-host mode used below.
+
 ---
 
-## 3. Deploy the Backend to Hugging Face Spaces (free, permanent)
+## 3. Share a Live Test Link — Self-Hosted Demo (free, no card)
+
+One process + one tunnel = one public URL. No CORS, no second host, no signup
+walls — friends test the *full* app (OCR scanning and semantic search included,
+since your PC has the RAM for them).
+
+### Step 1 — One-time ngrok setup (email signup, no credit card)
+
+1. Create a free account: [dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup)
+2. Install: `winget install ngrok.ngrok`
+3. `ngrok config add-authtoken <YOUR_TOKEN>` — token is shown at
+   [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
+4. Claim your free **static domain** (a permanent URL):
+   [dashboard.ngrok.com/domains](https://dashboard.ngrok.com/domains)
+
+### Step 2 — Build the frontend (once, and after any UI change)
+
+```bash
+cd frontend
+npm run build
+```
+
+### Step 3 — Launch
+
+Paste your static domain into `$NgrokDomain` at the top of `start_demo.ps1`
+(repo root), then:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_demo.ps1
+```
+
+The script starts the backend, waits for it, opens the tunnel and prints your
+permanent public URL (it opens in your browser too).
+
+### What testers experience
+
+- First visit shows ngrok's one-time “You are about to visit…” page — click
+  **Visit Site** (normal on the free plan; API calls already skip it)
+- They register a MedPak AI account inside the app, then everything works:
+  search, live prices, alternatives, OCR scan, chat
+- Each visitor is rate-limited by their real IP (the tunnel forwards it)
+
+### Ground rules
+
+- **Keep the PC on and awake** while friends test — the app runs on your
+  machine (Windows Settings → System → Power → set sleep to *Never* while
+  plugged in during demo days)
+- Close the ngrok window to stop sharing; the URL is static, so it comes back
+  next time you run the script
+- Free-plan limits: 1 GB of responses + 20k requests per month — far more than
+  a test round needs
+- Accounts your friends create live in your local
+  `backend/database/users.db`
+
+**Troubleshooting:** “Port 8000 busy” means a backend is already running — the
+script reuses it. Tunnel errors usually mean a typo in `$NgrokDomain`.
+
+---
+
+## 4. Optional — Cloud Backend on Hugging Face Spaces ($9/month PRO)
+
+> Since July 2026, creating a Docker or Gradio Space requires a paid PRO plan
+> ($9/month, cancel anytime); CPU Basic hardware itself stays $0/hour. Skip
+> this section unless you want the cloud copy — the self-hosted demo in §3 is
+> the free path.
 
 ### Step 1 — Create the Space
 
@@ -97,7 +169,10 @@ https://<your-hf-username>-medpak-ai-backend.hf.space/api/health/
 
 ---
 
-## 4. Deploy the Frontend to Vercel (free, permanent)
+## 5. Optional — Cloud Frontend on Vercel (free)
+
+Only needed for the split cloud setup (§4 backend + this frontend). For the
+self-hosted demo the backend already serves the frontend — skip Vercel.
 
 ### Step 1 — Import the repository
 
@@ -145,7 +220,7 @@ vercel --prod        # ship to production
 
 ---
 
-## 5. Environment Variables Reference (backend)
+## 6. Environment Variables Reference (backend)
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
@@ -160,7 +235,7 @@ vercel --prod        # ship to production
 
 ---
 
-## 6. Live Price System
+## 7. Live Price System
 
 Prices are scraped from Pakistani pharmacy websites (Dvago product pages +
 search engines) and cached in 3 tiers:
@@ -175,16 +250,18 @@ accurate. Database prices are never shown — only verified live prices.
 
 ---
 
-## 7. Architecture
+## 8. Architecture
 
 ```
-Frontend (React/Vite)          Backend (FastAPI, HF Spaces)
-  Vercel / localhost:5173  →     /api/*  (JWT auth)
-                                      ├── Groq GPT-OSS 120B (LLM, RAG chat)
-                                      ├── ChromaDB + MiniLM (semantic search)
-                                      ├── EasyOCR (medicine box scanning)
-                                      ├── SQLite pharmapedia.db (23k brands)
-                                      └── Live price scrapers (Dvago + SERP)
+Frontend (React/Vite)
+  served by FastAPI (self-host) · Vercel (cloud) · :5173 (dev)
+        ↓ /api/*  (JWT auth)
+Backend (FastAPI)
+  ├── Groq GPT-OSS 120B (LLM, RAG chat)
+  ├── ChromaDB + MiniLM (semantic search)
+  ├── EasyOCR (medicine box scanning)
+  ├── SQLite pharmapedia.db (23k brands)
+  └── Live price scrapers (Dvago + SERP)
 ```
 
 ---

@@ -83,7 +83,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "ngrok-skip-browser-warning"],
 )
 
 # ── Include routers ───────────────────────────────────────────────────────────
@@ -123,10 +123,31 @@ def _warm_rag_index() -> None:
         print(f"[RAG] Index warm-up failed (chat falls back to keyword search): {e}")
 
 
-@app.get("/")
-def root():
-    return {"message": f"Welcome to {settings.APP_NAME} API. Visit /docs for Swagger UI."}
+# ── Self-hosted frontend ──────────────────────────────────────────────────
+# When the built frontend exists (npm run build → frontend/dist), serve the
+# whole app from the API itself: one port, one URL, no CORS — ideal for a
+# self-hosted demo tunnelled through ngrok. /api routes stay untouched.
+_FRONTEND_DIST = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
+)
+if os.path.isdir(_FRONTEND_DIST):
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {"message": f"Welcome to {settings.APP_NAME} API. Visit /docs for Swagger UI."}
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT)
+    # proxy_headers: when self-hosting behind a tunnel (ngrok) the real client
+    # IP arrives in X-Forwarded-For — without this every visitor shares the
+    # tunnel's localhost identity and one combined rate-limit bucket.
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.PORT,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )

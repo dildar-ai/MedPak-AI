@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-/** Dev uses Vite proxy (/api → backend). Production: set VITE_API_BASE_URL at build time. */
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? '/api' : 'http://127.0.0.1:8000/api');
+/** Dev uses the Vite proxy (/api → backend). Production builds default to
+ *  same-origin /api so the self-hosted app works behind any host or tunnel;
+ *  set VITE_API_BASE_URL only when the API lives on a different origin
+ *  (e.g. Vercel frontend + hosted API). */
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 // ── Auth storage ─────────────────────────────────────────────────────────────
 
@@ -36,6 +37,10 @@ const api = axios.create({
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+    // ngrok's free tier serves an interstitial warning page for browser
+    // traffic unless requests carry this header — API calls through the
+    // tunnel would otherwise receive HTML instead of JSON.
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
