@@ -291,6 +291,7 @@ _PER_UNIT_MIN: float = 2.0
 def select_best_result(
     results: list[dict] | None,
     strength_mg: float | None = None,
+    form_name: str | None = None,
 ) -> dict | None:
     """
     Pick the most trustworthy listing from one brand's scraped results.
@@ -316,6 +317,27 @@ def select_best_result(
     ]
     pool = sane or valid
 
+    if form_name:
+        f = form_name.strip().lower()
+        syns = []
+        if "inj" in f or "amp" in f or "vial" in f: syns = ["inj", "amp", "vial"]
+        elif "tab" in f: syns = ["tab"]
+        elif "cap" in f: syns = ["cap"]
+        elif "syr" in f or "susp" in f: syns = ["syrup", "suspension", "liquid", "solution"]
+        elif "gel" in f or "oint" in f or "cream" in f: syns = ["gel", "ointment", "cream", "topical"]
+        elif "drop" in f: syns = ["drop"]
+        elif "sach" in f: syns = ["sachet"]
+        else: syns = [f]
+
+        if syns:
+            pool = [
+                r for r in pool
+                if any(s in r.get("title", "").lower() for s in syns)
+            ]
+
+    if not pool:
+        return None
+
     if strength_mg:
         matching = [
             r for r in pool
@@ -328,7 +350,7 @@ def select_best_result(
     return min(pool, key=lambda r: r["price_pkr"])
 
 
-def get_best_result(brand_name: str, strength_mg: float | None = None) -> dict | None:
+def get_best_result(brand_name: str, strength_mg: float | None = None, form_name: str | None = None) -> dict | None:
     """
     Cheapest valid SAVED live result for a brand (memory → DB, never scrapes).
     Returns the full result dict incl. pack_qty / pack_desc / title, or None.
@@ -339,7 +361,7 @@ def get_best_result(brand_name: str, strength_mg: float | None = None) -> dict |
         if db_results:
             results = [_format_result(brand_name, r) for r in db_results]
             set_cached_price(brand_name, results)
-    return select_best_result(results, strength_mg=strength_mg)
+    return select_best_result(results, strength_mg=strength_mg, form_name=form_name)
 
 
 # ── Instant batch lookup (no scraping) ────────────────────────────────────────

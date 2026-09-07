@@ -51,7 +51,20 @@ def scan_medicine_image(image_bytes: bytes) -> str:
     except Exception as e:
         print(f"[OCR] Error loading image: {e}")
         return ""
-        
+
+    # ── Resize large images for performance ────────────────────────────────
+    # Smartphone photos are often 4K+ (12MP). Running EasyOCR on a raw
+    # high-res image on CPU is extremely slow and can OOM. Medicine brand
+    # names are large enough that 1024px preserves accuracy while cutting
+    # processing time by 5-10x.
+    MAX_DIM = 1024
+    w, h = img.size
+    if max(w, h) > MAX_DIM:
+        scale = MAX_DIM / max(w, h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+        print(f"[OCR] Resized {w}x{h} → {new_w}x{new_h}")
+
     # Convert to numpy array for EasyOCR
     img_np = np.array(img)
     

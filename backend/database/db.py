@@ -126,24 +126,28 @@ def _keyword_sql(q: str, fetch: int) -> list[dict]:
 
     # Deduplicate by brand product name so each variant (CF, Extra, etc.)
     # keeps its own price while collapsing duplicate DB rows.
-    seen: dict[str, dict] = {}
+    seen: dict[tuple[str, str], dict] = {}
     for row in rows:
         r = _row_to_dict(row)
         r["retail_price_num"] = _clean_price(r["retail_price"])
         r["trade_price_num"] = _clean_price(r.get("trade_price", ""))
         r["company"] = (r.get("company") or "").strip() or "Unknown"
-        key = (r.get("brand_product_name") or "").lower()
+        brand_key = (r.get("brand_product_name") or "").lower()
+        form_key = (r.get("form") or "").lower().strip()
+        key = (brand_key, form_key)
         if key not in seen or r["relevance"] < seen[key]["relevance"]:
             seen[key] = r
     return list(seen.values())
 
 
-def _merge_results(merged: dict[str, dict], rows: list[dict], base_relevance: int) -> None:
-    """Merge keyword rows into a result map, keeping the best relevance per brand."""
+def _merge_results(merged: dict[tuple[str, str], dict], rows: list[dict], base_relevance: int) -> None:
+    """Merge keyword rows into a result map, keeping the best relevance per brand+form."""
     for r in rows:
         r = dict(r)
         r["relevance"] = base_relevance + min(r.get("relevance", 3), 3)
-        key = (r.get("brand_product_name") or "").lower()
+        brand_key = (r.get("brand_product_name") or "").lower()
+        form_key = (r.get("form") or "").lower().strip()
+        key = (brand_key, form_key)
         if key not in merged or r["relevance"] < merged[key]["relevance"]:
             merged[key] = r
 
@@ -185,7 +189,7 @@ def search_medicines(query: str, limit: int = 30) -> list[dict]:
     if len(q) < 2:
         return []
 
-    merged: dict[str, dict] = {}
+    merged: dict[tuple[str, str], dict] = {}
 
     # ── Tier 1: full keyword search (separator-insensitive) ────────────────
     _merge_results(merged, _keyword_sql(q, fetch=limit * 3), base_relevance=0)

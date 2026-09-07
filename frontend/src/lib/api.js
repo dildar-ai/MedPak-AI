@@ -56,15 +56,28 @@ api.interceptors.request.use((config) => {
 // On 401 (expired/invalid token) — drop credentials and tell the app to show
 // the login screen. A 401 from /auth/login itself means wrong credentials and
 // must NOT trigger the logout flow.
+// Also show user-friendly toast notifications for common error types.
+import { toast } from '../components/Toast';
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
     const url = error.config?.url || '';
+
     if (status === 401 && !url.startsWith('/auth/')) {
       authStorage.clear();
       window.dispatchEvent(new Event('medpak:unauthorized'));
+    } else if (status === 429) {
+      toast.error('Too many requests — please slow down and try again in a minute.');
+    } else if (status >= 500) {
+      toast.error('Server error — please try again in a moment.');
+    } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      toast.error('Request timed out — the server may be busy. Try again.');
+    } else if (!error.response) {
+      toast.error('Network error — please check your internet connection.');
     }
+
     return Promise.reject(error);
   }
 );
@@ -117,10 +130,13 @@ export const medicineApi = {
     return response.data;
   },
 
-  getAlternatives: async (drugId, brandName = null) => {
-    const url = brandName
-      ? `/medicine/${drugId}/alternatives?brand=${encodeURIComponent(brandName)}`
-      : `/medicine/${drugId}/alternatives`;
+  getAlternatives: async (drugId, brandName = null, form = null, strength = null) => {
+    let url = `/medicine/${drugId}/alternatives`;
+    const params = [];
+    if (brandName) params.push(`brand=${encodeURIComponent(brandName)}`);
+    if (form) params.push(`form=${encodeURIComponent(form)}`);
+    if (strength) params.push(`strength=${encodeURIComponent(strength)}`);
+    if (params.length) url += `?${params.join('&')}`;
     const response = await api.get(url);
     return response.data;
   },
@@ -139,10 +155,10 @@ export const medicineApi = {
     return response.data;
   },
 
-  getLivePrice: async (brandName, strength = null) => {
-    let url = `/medicine/live-price?brand=${encodeURIComponent(brandName)}`;
-    if (strength) url += `&strength=${encodeURIComponent(strength)}`;
-    const response = await api.get(url);
+  getLivePrice: async (brand, strength = null, form = null) => {
+    const response = await api.get('/medicine/live-price', {
+      params: { brand, strength, form },
+    });
     return response.data;
   },
 

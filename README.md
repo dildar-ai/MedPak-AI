@@ -17,9 +17,9 @@ boxes with OCR, and chat with an AI assistant in English, Urdu or Roman Urdu.
 | 🔍 **Instant Medicine Search** | 23,332 Pakistani medicine brands / 1,956 generics, typo-tolerant fuzzy matching |
 | 🧪 **Fixed-Dose Combination Aware** | Multi-salt products (e.g. Panadol CF) show their *complete* salt composition, and alternatives match the *exact same salt set* |
 | 💰 **Live Price Scraping** | Real-time prices from Pakistani pharmacies (Dvago + search-engine fallback), 3-tier cached (memory → SQLite → live) |
-| 📉 **Cheaper Alternatives** | Same salt + same dosage form, ranked by per-unit price across pack sizes |
-| 📷 **Scan Medicine Box** | OCR (EasyOCR) reads a medicine box photo and finds it in the database |
-| 🤖 **Bilingual AI Chat** | RAG (ChromaDB) + Groq GPT-OSS 120B with strict information-only guardrails — answers in English, Urdu and Roman Urdu |
+| 📉 **Cheaper Alternatives (Apples-to-Apples)** | Strictly compares medicines of the *exact same dosage form* (Gel vs Gel) to prevent misleading savings, ranked by per-unit price. |
+| 📷 **Scan Medicine Box** | Fast OCR (EasyOCR) reads a medicine box photo and finds it in the database. Auto-downscales high-res photos for speed. |
+| 🤖 **Bilingual AI Chat** | RAG (ChromaDB) + Groq GPT-OSS 120B with strict information-only guardrails — answers in English, Urdu and Roman Urdu. |
 | 🔐 **Secure by Design** | JWT auth, bcrypt password hashing, rate limiting, deterministic pre-LLM guardrails |
 
 ## 🏗️ Architecture

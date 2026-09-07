@@ -189,7 +189,9 @@ const MedicineDetail = ({ drugId, brandData, onBack }) => {
     try {
       // Compare against the brand the user clicked, when known
       const brand = brandData?.brand_product_name || brandData?.brand_name || null;
-      const data = await medicineApi.getAlternatives(drugId, brand);
+      const brandForm = brandData?.form || null;
+      const brandStrength = brandData?.strength || null;
+      const data = await medicineApi.getAlternatives(drugId, brand, brandForm, brandStrength);
       setAltData(data);
       setAltError(false);
       // The backend responds instantly with saved prices and scrapes ALL

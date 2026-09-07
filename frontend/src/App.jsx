@@ -6,6 +6,7 @@ import MedicineCard from './components/MedicineCard';
 import MedicineDetail from './components/MedicineDetail';
 import Chatbot from './components/Chatbot';
 import Auth from './components/Auth';
+import Toast from './components/Toast';
 import { medicineApi, authApi, authStorage } from './lib/api';
 import logoIcon from './assets/logo-icon.png';
 
@@ -294,6 +295,7 @@ function App() {
 
   return (
     <div className={`flex flex-col bg-slate-50 ${mode === 'chat' ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'}`}>
+      <Toast />
       <Header onLogoClick={goHome} user={user} onLogout={handleLogout} />
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {renderContent()}

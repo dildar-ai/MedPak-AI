@@ -223,9 +223,6 @@ _VARIANT_MODIFIERS = {
     # Release/strength suffixes common in Pakistan: Risek DSR, Dilzem SR,
     # Brufen LA, Voltral CR, Tixylix DM, Losar OD, Convulex ER, Glucophage XR
     "DSR", "SR", "LA", "CR", "DR", "DM", "OD", "ER", "XR",
-    # Formulation lines that are separate products from the oral brand
-    # (Risek Inf 40mg injection is not Risek capsules)
-    "IV", "INF",
 }
 
 

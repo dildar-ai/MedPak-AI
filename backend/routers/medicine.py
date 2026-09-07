@@ -73,7 +73,7 @@ async def search(
             continue
         brand_names.append(brand)
         strength_map.setdefault(brand, r.get("strength") or "")
-        best = get_best_result(brand, strength_mg=parse_strength_mg(r.get("strength") or ""))
+        best = get_best_result(brand, strength_mg=parse_strength_mg(r.get("strength") or ""), form_name=r.get("form"))
         if best:
             qty = best.get("pack_qty")
             r["live_price_pkr"] = best["price_pkr"]
@@ -157,6 +157,7 @@ async def get_live_price(
     strength: Optional[str] = Query(
         None, description="Formulation strength from the DB (e.g. '20 MG') — sharpens the live search"
     ),
+    form: Optional[str] = Query(None, description="Formulation (e.g. 'Tablet', 'Injection')"),
     user: dict = Depends(get_current_user),
 ):
     """
@@ -166,7 +167,7 @@ async def get_live_price(
     """
     results = await get_or_fetch_price(brand, strength)
     if results:
-        best = select_best_result(results, strength_mg=parse_strength_mg(strength or ""))
+        best = select_best_result(results, strength_mg=parse_strength_mg(strength or ""), form_name=form)
         if best:
             qty = best.get("pack_qty")
             return {
@@ -363,6 +364,8 @@ async def get_drug_alternatives(
     drug_id: int,
     limit: int = 20,
     brand: Optional[str] = Query(None, description="Brand the user clicked — used as the price reference"),
+    form: Optional[str] = Query(None, description="Dosage form of the clicked brand (e.g. 'Tablets') — ensures correct form filtering"),
+    strength: Optional[str] = Query(None, description="Strength of the clicked brand (e.g. '500 MG') — sharpens form matching"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     user: dict = Depends(get_current_user),
 ):
@@ -446,12 +449,23 @@ async def get_drug_alternatives(
 
     # ── Prioritize same form/strength as the clicked brand ────────────────
     # Comparing a 500mg capsule against a pediatric syrup is noise.
-    if ref_variant:
+    # Use the explicitly-passed form/strength from the frontend when available
+    # (they come straight from the card the user clicked and are always correct).
+    # Fall back to the ref_variant lookup only when the frontend doesn't send them.
+    ref_form = ""
+    ref_str = ""
+    if form and isinstance(form, str) and form.strip():
+        ref_form = form.strip().lower()
+    elif ref_variant:
         ref_form = (ref_variant.get("form") or "").strip().lower()
+    if strength and isinstance(strength, str) and strength.strip():
+        ref_str = strength.strip().lower()
+    elif ref_variant:
         ref_str = (ref_variant.get("strength") or "").strip().lower()
 
+    if ref_form:
         def _form_rank(v):
-            same_form = bool(ref_form) and (v.get("form") or "").strip().lower() == ref_form
+            same_form = (v.get("form") or "").strip().lower() == ref_form
             same_str = bool(ref_str) and (v.get("strength") or "").strip().lower() == ref_str
             return 0 if (same_form and same_str) else (1 if same_form else 2)
 
@@ -511,7 +525,7 @@ async def get_drug_alternatives(
         name = v.get("brand_product_name", "")
         strength_mg = parse_strength_mg(v.get("strength") or "")
         results = saved.get(name)
-        best = select_best_result(results, strength_mg=strength_mg) if results else None
+        best = select_best_result(results, strength_mg=strength_mg, form_name=v.get("form")) if results else None
 
         per_unit = None
         if best and best.get("pack_qty"):
@@ -551,25 +565,29 @@ async def get_drug_alternatives(
     # ── Reference: the brand the user clicked ─────────────────────────────
     ref_name = (ref_variant or {}).get("brand_product_name") or (all_names[0] if all_names else "")
     ref_entry = next((e for e in enriched if e["brand_product_name"] == ref_name), None)
-    ref_form = (ref_variant or {}).get("form", "").strip().lower() if ref_variant else ""
+    # ref_form is already set earlier from explicit query params or ref_variant
 
-    # Rank by PER-UNIT price when the pack is known — a fair comparison
-    # across pack sizes (a 21-cap pack beats a 10-cap pack at the same
-    # price). Fall back to pack price when no pack info exists.
+    # Rank: First prioritize exact dosage form matches (0), then other forms (1).
+    # Within each group, rank by PER-UNIT price when the pack is known — a fair 
+    # comparison across pack sizes. Fall back to pack price when no pack info exists.
     def _rank(e):
+        is_same_form = e.get("form", "").strip().lower() == ref_form if ref_form else False
+        form_priority = 0 if is_same_form else 1
+
         if e["price_per_unit"] is not None:
-            return (0, e["price_per_unit"])
+            return (form_priority, 0, e["price_per_unit"])
         if e["best_price"] is not None:
-            return (1, e["best_price"])
-        return (2, 0)
+            return (form_priority, 1, e["best_price"])
+        return (form_priority, 2, 0)
 
     # Only compare alternatives of the SAME DOSAGE FORM as the clicked brand.
     # Tablet vs suspension vs injection are different dosage forms and
     # comparing their prices (per tablet vs per ml vs per ampoule) is
-    # meaningless.
+    # meaningless. We include all alternatives even if they don't have a live
+    # price yet, so the user can watch them populate as the background scrape finishes.
     comparable = (
-        [e for e in enriched if e["best_price"] and e["form"].strip().lower() == ref_form]
-        if ref_form else [e for e in enriched if e["best_price"]]
+        [e for e in enriched if e["form"].strip().lower() == ref_form]
+        if ref_form else enriched
     )
 
     priced = sorted(comparable, key=_rank)[:limit]

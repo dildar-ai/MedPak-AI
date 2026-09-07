@@ -25,8 +25,8 @@ const MedicineCard = ({ medicine, onClick }) => {
     >
       <div className="flex justify-between items-start mb-3 gap-2">
         <div className="min-w-0">
-          <h3 className="text-lg font-bold text-slate-800 leading-tight group-hover:text-primary-600 transition-colors truncate" title={brandName}>
-            {brandName}
+          <h3 className="text-lg font-bold text-slate-800 leading-tight group-hover:text-primary-600 transition-colors truncate" title={`${brandName} ${form}`}>
+            {brandName} {form && <span className="font-extrabold text-slate-500 ml-1">{form}</span>}
           </h3>
           <p className="text-sm text-slate-500 font-medium mt-1 truncate" title={saltDisplay}>
             {saltDisplay}
