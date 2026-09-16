@@ -129,57 +129,52 @@ script reuses it. Tunnel errors usually mean a typo in `$NgrokDomain`.
 
 ---
 
-## 4. Optional — Cloud Backend on Hugging Face Spaces ($9/month PRO)
+## 4. Optional — Cloud Backend on Oracle Cloud (Always Free 24GB RAM)
 
-> Since July 2026, creating a Docker or Gradio Space requires a paid PRO plan
-> ($9/month, cancel anytime); CPU Basic hardware itself stays $0/hour. Skip
-> this section unless you want the cloud copy — the self-hosted demo in §3 is
-> the free path.
+> We will use Oracle Cloud's "Always Free" tier (ARM A1 Instance) which gives a massive 24GB of RAM and 4 cores. This is powerful enough to run PyTorch OCR and ChromaDB flawlessly. We will use **DuckDNS** to get a free domain name and secure the backend with HTTPS.
 
-### Step 1 — Create the Space
+### Step 1 — Spin up an Oracle Cloud Instance
 
-1. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
-2. **Space name:** `medpak-ai-backend` · **SDK:** **Docker** · **Blank** template · **Public**
-3. Create it (leave it empty)
+1. Go to [oracle.com/cloud/free](https://www.oracle.com/cloud/free/) and sign up.
+2. In the console, click **Create a VM instance**.
+3. **Image and Shape:** Change Image to **Ubuntu 22.04** (or newer). Change Shape to **Ampere ARM (VM.Standard.A1.Flex)** and drag the slider to **4 OCPUs** and **24GB RAM**.
+4. **Networking:** Assign a Public IPv4 address.
+5. **SSH Keys:** Save the private key! You will need it to connect.
+6. Click **Create**. Once running, copy its **Public IP Address**.
 
-### Step 2 — Push the backend code
+### Step 2 — Claim a free DuckDNS Domain
 
-From the `backend/` folder:
+1. Go to [duckdns.org](https://www.duckdns.org/) and log in.
+2. Enter a subdomain (e.g. `medpak`) and click **add domain**.
+3. In the "current ip" box for that domain, paste your Oracle VM's Public IP and click **update ip**.
 
-```powershell
-.\deploy_to_hf.ps1 -HfUser <your-hf-username> -SpaceName medpak-ai-backend
+### Step 3 — Open Oracle Cloud Firewall Ports
+
+Oracle Cloud blocks web traffic by default.
+1. Click your instance -> **Virtual Cloud Network (VCN)** -> **Security Lists** -> **Default Security List**.
+2. **Add Ingress Rules**:
+   - Port `80` (TCP, Source: `0.0.0.0/0`) for HTTP
+   - Port `443` (TCP, Source: `0.0.0.0/0`) for HTTPS
+
+### Step 4 — Run the Automated Setup Script
+
+SSH into your Oracle VM using the private key you downloaded:
+
+```bash
+ssh -i <your-private-key.key> ubuntu@<your-oracle-ip>
 ```
 
-When git asks for credentials: username = your HF username, password = an
-**HF access token** with *write* permission ([settings/tokens](https://huggingface.co/settings/tokens)).
+Once inside, download and run the automated setup script:
 
-The script handles Git LFS automatically (the 15 MB medicine database exceeds
-HF's 10 MB plain-git limit) and never uploads user accounts or local caches —
-only source code, the medicine DB and the Dvago product index.
-
-### Step 3 — Add secrets in the Space
-
-Space → **Settings → Variables and secrets** → add:
-
-| Name | Value |
-|---|---|
-| `GROQ_API_KEY` | `gsk_...` (your Groq key) |
-| `SECRET_KEY` | any long random string (JWT signing) |
-| `CORS_ORIGINS` | `["*"]` (JWT travels in the Authorization header, not cookies) |
-| `DEBUG` | `false` |
-
-### Step 4 — Wait for the build (~10–20 min first time)
-
-The Docker image installs PyTorch + EasyOCR. When it finishes, verify:
-
-```
-https://<your-hf-username>-medpak-ai-backend.hf.space/api/health/
+```bash
+wget https://raw.githubusercontent.com/dildar-ai/MedPak-AI/main/setup_server.sh
+chmod +x setup_server.sh
+./setup_server.sh
 ```
 
-> Notes: free Spaces sleep after ~48 h idle (first request after sleep takes ~30 s).
-> Storage is ephemeral — user accounts and cached prices reset on restart
-> (the medicine database itself is baked into the image). The first OCR scan
-> after a restart downloads model weights (~1–2 min).
+Follow the prompts to enter your DuckDNS domain, email, and Groq API key. The script will install Python, configure Nginx, generate SSL certificates, clone your repository, and start the backend service automatically!
+
+Once finished, verify it works by visiting `https://your-domain.duckdns.org/api/health/`. Copy this URL for Vercel!
 
 ---
 
@@ -205,7 +200,7 @@ Add this **Environment Variable** on the same screen:
 
 | Name | Value |
 |---|---|
-| `VITE_API_BASE_URL` | `https://<your-hf-username>-medpak-ai-backend.hf.space/api` |
+| `VITE_API_BASE_URL` | `https://your-domain.duckdns.org/api` (Replace with your actual DuckDNS URL) |
 
 Leave Build Command and Output Directory at their defaults, click **Deploy**
 (≈ 1 minute).
